@@ -16,40 +16,47 @@ namespace DbfRead
             var dbfPath = @"D:\CLIENTES.DBF";
             using (var dbfTable = new DbfTable(dbfPath))
             {
-                //Con
-                SQLiteConnection connection = new SQLiteConnection("Data Source=database.db;Version=3;");
-                connection.Open();
                 var dbfRecord = new DbfRecord(dbfTable);
-                //read column names and create sqlite database table
-                string sql = "CREATE TABLE IF NOT EXISTS cliente  (";
-                foreach (var dbfColumn in dbfTable.Columns)
+                //Con
+                using (var connection = new SQLiteConnection("Data Source=database.db;Version=3;"))
                 {
-                    sql += dbfColumn.ColumnName + " TEXT,";
+                    connection.Open();
 
-                }
-                sql = sql.Substring(0, sql.Length - 1);
-                sql += ")";
-                SQLiteCommand command = new SQLiteCommand(sql, connection);
-                command.ExecuteNonQuery();
-                while (dbfTable.Read(dbfRecord))
-                {
-                    if (skipDeleted && dbfRecord.IsDeleted)
+                    //read column names and create sqlite database table
+                    string sql = "CREATE TABLE IF NOT EXISTS cliente  (";
+                    foreach (var dbfColumn in dbfTable.Columns)
                     {
-                        continue;
+                        sql += dbfColumn.ColumnName + " TEXT,";
                     }
-                    using var transaction = connection.BeginTransaction();
-                    //insert data into sqlite database table
-                    sql = "INSERT INTO cliente VALUES (";
-                    foreach (var dbfValue in dbfRecord.Values)
-                    {
-                        sql += "'" + dbfValue.ToString() + "',";
-                    }
-                    sql = sql.Substring(0, sql.Length - 1);
+                    sql = sql.TrimEnd(',');
                     sql += ")";
-                    command = new SQLiteCommand(sql, connection);
+                    SQLiteCommand command = new SQLiteCommand(sql, connection);
                     command.ExecuteNonQuery();
+                }
+                using (var connection = new SQLiteConnection("Data Source=database.db;Version=3;"))
+                {
+                    connection.Open();
+                    using var transaction = connection.BeginTransaction();
+                    while (dbfTable.Read(dbfRecord))
+                    {
+                        if (skipDeleted && dbfRecord.IsDeleted)
+                        {
+                            continue;
+                        }
 
-                    Console.WriteLine(sql);
+                        //insert data into sqlite database table
+                        string sql = "INSERT INTO cliente VALUES (";
+                        foreach (var dbfValue in dbfRecord.Values)
+                        {
+                            sql += "'" + dbfValue.ToString().Replace("'", "''") + "',";
+                        }
+                        sql = sql.TrimEnd(',');
+                        sql += ")";
+                        SQLiteCommand command = new SQLiteCommand(sql, connection);
+                        command.ExecuteNonQuery();
+
+                        Console.WriteLine(sql);
+                    }
                     transaction.Commit();
                 }
             }
