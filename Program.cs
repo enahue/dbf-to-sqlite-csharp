@@ -1,9 +1,5 @@
-﻿using System;
-using System.IO;
-using System.Data;
-using System.Data.SQLite;
+﻿using System.Data.SQLite;
 using DbfDataReader;
-using System.Transactions;
 
 
 namespace DbfRead
@@ -13,17 +9,32 @@ namespace DbfRead
         static void Main(string[] args)
         {
             var skipDeleted = true;
-            var dbfPath = @"D:\CLIENTES.DBF";
+            var pathFiles = @"D:\";
+            var dbfPath = pathFiles + "example.DBF";
+            string dbfName = Path.GetFileNameWithoutExtension(dbfPath);
+            var sqliteDb = pathFiles + dbfName + ".db";
+
+            if (!File.Exists(sqliteDb))
+            {
+
+                SQLiteConnection.CreateFile(sqliteDb);
+
+            }
+            else
+            {
+                File.Delete(sqliteDb);
+                SQLiteConnection.CreateFile(sqliteDb);
+
+            }
             using (var dbfTable = new DbfTable(dbfPath))
             {
                 var dbfRecord = new DbfRecord(dbfTable);
-                //Con
-                using (var connection = new SQLiteConnection("Data Source=database.db;Version=3;"))
+
+                using (var connection = new SQLiteConnection($"Data Source={sqliteDb};Version=3;"))
                 {
                     connection.Open();
 
-                    //read column names and create sqlite database table
-                    string sql = "CREATE TABLE IF NOT EXISTS cliente  (";
+                    string sql = $"CREATE TABLE IF NOT EXISTS {dbfName}  (";
                     foreach (var dbfColumn in dbfTable.Columns)
                     {
                         sql += dbfColumn.ColumnName + " TEXT,";
@@ -33,7 +44,7 @@ namespace DbfRead
                     SQLiteCommand command = new SQLiteCommand(sql, connection);
                     command.ExecuteNonQuery();
                 }
-                using (var connection = new SQLiteConnection("Data Source=database.db;Version=3;"))
+                using (var connection = new SQLiteConnection($"Data Source={sqliteDb};Version=3;"))
                 {
                     connection.Open();
                     using var transaction = connection.BeginTransaction();
@@ -44,8 +55,7 @@ namespace DbfRead
                             continue;
                         }
 
-                        //insert data into sqlite database table
-                        string sql = "INSERT INTO cliente VALUES (";
+                        string sql = $"INSERT INTO {dbfName} VALUES (";
                         foreach (var dbfValue in dbfRecord.Values)
                         {
                             sql += "'" + dbfValue.ToString().Replace("'", "''") + "',";
